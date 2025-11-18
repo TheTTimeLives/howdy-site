@@ -10,12 +10,14 @@ jobs:
 
     env:
       FIREBASE_PROJECT_ID: howdy-site-123
-      # Production function URL used by the web app
-      WAITLIST_URL: https://us-central1-${{ env.FIREBASE_PROJECT_ID }}.cloudfunctions.net/siteWaitlist
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Set WAITLIST_URL
+        run: |
+          echo "WAITLIST_URL=https://us-central1-${FIREBASE_PROJECT_ID}.cloudfunctions.net/siteWaitlist" >> $GITHUB_ENV
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
