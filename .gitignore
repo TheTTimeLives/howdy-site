@@ -1,3 +1,13 @@
+# Local environment files (do not commit)
+.env
+.env.*
+
+# Local Firebase emulator logs
+firebase/.functions.log
+
+# Safety (already ignored globally, but keep local too)
+firebase/functions/node_modules/
+
 # Miscellaneous
 *.class
 *.lock

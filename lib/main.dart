@@ -1,9 +1,9 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:http/http.dart' as http;
+import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:async';
 
 // Configurable via --dart-define
 const String kApiBaseUrl = String.fromEnvironment(
@@ -14,15 +14,32 @@ const String kEmailCapturePath = String.fromEnvironment(
   'EMAIL_CAPTURE_PATH',
   defaultValue: '/site/waitlist',
 );
-const String kWaitlistUrl = String.fromEnvironment(
-  'WAITLIST_URL',
-  defaultValue: '',
-);
+// Firebase Web config via --dart-define (no Functions required)
+const String kFbApiKey = String.fromEnvironment('FIREBASE_WEB_API_KEY', defaultValue: '');
+const String kFbAppId = String.fromEnvironment('FIREBASE_WEB_APP_ID', defaultValue: '');
+const String kFbMessagingSenderId = String.fromEnvironment('FIREBASE_WEB_MESSAGING_SENDER_ID', defaultValue: '');
+const String kFbProjectId = String.fromEnvironment('FIREBASE_PROJECT_ID', defaultValue: '');
+const String kFbStorageBucket = String.fromEnvironment('FIREBASE_WEB_STORAGE_BUCKET', defaultValue: '');
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  if (kFbApiKey.isNotEmpty &&
+      kFbAppId.isNotEmpty &&
+      kFbMessagingSenderId.isNotEmpty &&
+      kFbProjectId.isNotEmpty) {
+    await Firebase.initializeApp(
+      options: FirebaseOptions(
+        apiKey: kFbApiKey,
+        appId: kFbAppId,
+        messagingSenderId: kFbMessagingSenderId,
+        projectId: kFbProjectId,
+        storageBucket: kFbStorageBucket.isNotEmpty ? kFbStorageBucket : null,
+      ),
+    );
+  }
   // Helpful boot log
   // ignore: avoid_print
-  print('Howdy Site starting with API_BASE_URL=$kApiBaseUrl, EMAIL_CAPTURE_PATH=$kEmailCapturePath');
+  print('Howdy Site starting (Firestore ${kFbProjectId.isNotEmpty ? "enabled" : "disabled"})');
   runApp(const HowdySiteApp());
 }
 
@@ -109,70 +126,44 @@ class _LandingPageState extends State<LandingPage> {
       return;
     }
 
-    // Build endpoint robustly to avoid missing slashes
-    // Prefer explicit WAITLIST_URL if provided (e.g., Firebase Functions URL)
-    final override = kWaitlistUrl.trim();
-    final uri = override.isNotEmpty
-        ? Uri.parse(override)
-        : (() {
-            final capture = kEmailCapturePath.trim();
-            final isAbsolute = capture.startsWith('http://') || capture.startsWith('https://');
-            return isAbsolute
-                ? Uri.parse(capture)
-                : Uri.parse(kApiBaseUrl).resolve(capture.startsWith('/') ? capture : '/$capture');
-          })();
+    // Prefer Firestore direct if Firebase config is provided; otherwise show error
+    final canUseFirestore = Firebase.apps.isNotEmpty;
+    if (!canUseFirestore) {
+      setState(() {
+        _errorText = 'Configuration missing. Please try again later.';
+      });
+      return;
+    }
 
     // ignore: avoid_print
-    print('NotifyMe: submitting to $uri with email="$email"');
+    print('NotifyMe: saving to Firestore (project=$kFbProjectId) email="$email"');
     try {
       setState(() {
         _submitting = true;
       });
 
-      final response = await http.post(
-        uri,
-        headers: const {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: jsonEncode({'email': email}),
-      );
+      await FirebaseFirestore.instance.collection('waitlist').doc(email).set({
+        'email': email,
+        'createdAt': DateTime.now().millisecondsSinceEpoch,
+        'updatedAt': DateTime.now().millisecondsSinceEpoch,
+        'source': 'howdy-site-web',
+      }, SetOptions(merge: true)).timeout(const Duration(seconds: 12));
 
+      setState(() {
+        _successText = 'Thanks! We\'ll be in touch.';
+      });
+      _emailController.clear();
+    } on TimeoutException catch (_) {
       // ignore: avoid_print
-      print('NotifyMe: response status=${response.statusCode}');
-      // ignore: avoid_print
-      print('NotifyMe: response body=${response.body}');
-
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        try {
-          final data = jsonDecode(response.body) as Map<String, dynamic>;
-          final saved = data['saved'];
-          // ignore: avoid_print
-          print('NotifyMe: parsed ok, saved=$saved');
-        } catch (e) {
-          // ignore: avoid_print
-          print('NotifyMe: parse ok body failed: $e');
-        }
-        setState(() {
-          _successText = 'Thanks! We\'ll be in touch.';
-        });
-        _emailController.clear();
-      } else {
-        String message = 'Something went wrong. Please try again.';
-        try {
-          final data = jsonDecode(response.body) as Map<String, dynamic>;
-          final err = data['error']?.toString();
-          if (err != null && err.isNotEmpty) message = err;
-        } catch (_) {}
-        setState(() {
-          _errorText = '$message (HTTP ${response.statusCode})';
-        });
-      }
+      print('NotifyMe: Firestore write timed out');
+      setState(() {
+        _errorText = 'Request timed out. Please try again.';
+      });
     } catch (e) {
       // ignore: avoid_print
-      print('NotifyMe: network error: $e');
+      print('NotifyMe: Firestore error: $e');
       setState(() {
-        _errorText = 'Network error. Please try again.';
+        _errorText = 'Something went wrong. Please try again.';
       });
     } finally {
       setState(() {
