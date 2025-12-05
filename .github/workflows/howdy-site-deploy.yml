@@ -47,6 +47,7 @@ jobs:
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ env.FIREBASE_SERVICE_ACCOUNT_JSON }}
+          project_id: ${{ env.FIREBASE_PROJECT_ID }}
       
       - name: Deploy with Service Account (preferred)
         if: ${{ env.FIREBASE_SERVICE_ACCOUNT_JSON != '' }}
