@@ -15,6 +15,7 @@ jobs:
       FIREBASE_WEB_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_WEB_MESSAGING_SENDER_ID }}
       FIREBASE_WEB_STORAGE_BUCKET: ${{ secrets.FIREBASE_WEB_STORAGE_BUCKET }}
       FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+      FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
 
     steps:
       - name: Checkout
@@ -43,24 +44,29 @@ jobs:
         run: npm i -g firebase-tools
       
       - name: Authenticate to Google Cloud (service account)
+        id: auth
         if: ${{ env.FIREBASE_SERVICE_ACCOUNT_JSON != '' }}
         uses: google-github-actions/auth@v2
+        continue-on-error: true
         with:
           credentials_json: ${{ env.FIREBASE_SERVICE_ACCOUNT_JSON }}
           project_id: ${{ env.FIREBASE_PROJECT_ID }}
       
       - name: Deploy with Service Account (preferred)
+        id: deploy_sa
         if: ${{ env.FIREBASE_SERVICE_ACCOUNT_JSON != '' }}
         working-directory: .
+        continue-on-error: true
         run: |
           firebase deploy --only hosting:howdy-site-123,firestore:rules --project ${FIREBASE_PROJECT_ID} --non-interactive
       
       - name: Deploy with Legacy Token (fallback)
-        if: ${{ env.FIREBASE_SERVICE_ACCOUNT_JSON == '' }}
+        if: ${{ env.FIREBASE_TOKEN != '' && (env.FIREBASE_SERVICE_ACCOUNT_JSON == '' || steps.auth.outcome == 'failure' || steps.deploy_sa.outcome == 'failure') }}
         working-directory: .
         env:
-          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+          FIREBASE_TOKEN: ${{ env.FIREBASE_TOKEN }}
         run: |
+          unset GOOGLE_APPLICATION_CREDENTIALS CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE GOOGLE_GHA_CREDS_PATH CLOUDSDK_CORE_PROJECT CLOUDSDK_PROJECT GCLOUD_PROJECT GCP_PROJECT GOOGLE_CLOUD_PROJECT || true
           firebase deploy --only hosting:howdy-site-123,firestore:rules --project ${FIREBASE_PROJECT_ID} --non-interactive
 
 
