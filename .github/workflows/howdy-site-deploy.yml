@@ -14,6 +14,7 @@ jobs:
       FIREBASE_WEB_APP_ID: ${{ secrets.FIREBASE_WEB_APP_ID }}
       FIREBASE_WEB_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_WEB_MESSAGING_SENDER_ID }}
       FIREBASE_WEB_STORAGE_BUCKET: ${{ secrets.FIREBASE_WEB_STORAGE_BUCKET }}
+      FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
 
     steps:
       - name: Checkout
@@ -42,19 +43,19 @@ jobs:
         run: npm i -g firebase-tools
       
       - name: Authenticate to Google Cloud (service account)
-        if: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON != '' }}
+        if: ${{ env.FIREBASE_SERVICE_ACCOUNT_JSON != '' }}
         uses: google-github-actions/auth@v2
         with:
-          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+          credentials_json: ${{ env.FIREBASE_SERVICE_ACCOUNT_JSON }}
       
       - name: Deploy with Service Account (preferred)
-        if: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON != '' }}
+        if: ${{ env.FIREBASE_SERVICE_ACCOUNT_JSON != '' }}
         working-directory: .
         run: |
           firebase deploy --only hosting:howdy-site-123,firestore:rules --project ${FIREBASE_PROJECT_ID} --non-interactive
       
       - name: Deploy with Legacy Token (fallback)
-        if: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON == '' }}
+        if: ${{ env.FIREBASE_SERVICE_ACCOUNT_JSON == '' }}
         working-directory: .
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
