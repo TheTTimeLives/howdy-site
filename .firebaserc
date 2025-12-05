@@ -1,6 +1,21 @@
 {
   "projects": {
     "default": "howdy-site-123"
+  },
+  "targets": {
+    "howdy-site-123": {
+      "hosting": {
+        "web": [
+          "howdy-site-123"
+        ]
+      }
+    }
+  }
+}
+
+{
+  "projects": {
+    "default": "howdy-site-123"
   }
 }
 

@@ -40,12 +40,25 @@ jobs:
 
       - name: Install Firebase CLI
         run: npm i -g firebase-tools
-
-      - name: Deploy (Hosting only)
+      
+      - name: Authenticate to Google Cloud (service account)
+        if: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON != '' }}
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+      
+      - name: Deploy with Service Account (preferred)
+        if: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON != '' }}
+        working-directory: .
+        run: |
+          firebase deploy --only hosting:howdy-site-123,firestore:rules --project ${FIREBASE_PROJECT_ID} --non-interactive
+      
+      - name: Deploy with Legacy Token (fallback)
+        if: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON == '' }}
         working-directory: .
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
         run: |
-          firebase deploy --only hosting,firestore:rules --project ${FIREBASE_PROJECT_ID} --non-interactive
+          firebase deploy --only hosting:howdy-site-123,firestore:rules --project ${FIREBASE_PROJECT_ID} --non-interactive
 
 

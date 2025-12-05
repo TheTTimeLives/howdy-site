@@ -3,6 +3,7 @@
     "source": "firebase/functions"
   },
   "hosting": {
+    "site": "howdy-site-123",
     "public": "build/web",
     "ignore": [
       "firebase.json",
@@ -23,6 +24,9 @@
         ]
       }
     ]
+  },
+  "firestore": {
+    "rules": "firestore.rules"
   },
   "emulators": {
     "functions": {
