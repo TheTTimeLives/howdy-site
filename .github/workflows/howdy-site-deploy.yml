@@ -15,7 +15,6 @@ jobs:
       FIREBASE_WEB_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_WEB_MESSAGING_SENDER_ID }}
       FIREBASE_WEB_STORAGE_BUCKET: ${{ secrets.FIREBASE_WEB_STORAGE_BUCKET }}
       FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
-      FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
 
     steps:
       - name: Checkout
@@ -57,14 +56,18 @@ jobs:
         if: ${{ env.FIREBASE_SERVICE_ACCOUNT_JSON != '' }}
         working-directory: .
         continue-on-error: true
+        env:
+          # Ensure token-based auth does not override ADC in this step
+          FIREBASE_TOKEN: ''
         run: |
           firebase deploy --only hosting:howdy-site-123,firestore:rules --project ${FIREBASE_PROJECT_ID} --non-interactive
       
       - name: Deploy with Legacy Token (fallback)
-        if: ${{ env.FIREBASE_TOKEN != '' && (env.FIREBASE_SERVICE_ACCOUNT_JSON == '' || steps.auth.outcome == 'failure' || steps.deploy_sa.outcome == 'failure') }}
+        if: ${{ secrets.FIREBASE_TOKEN != '' && (env.FIREBASE_SERVICE_ACCOUNT_JSON == '' || steps.auth.outcome == 'failure' || steps.deploy_sa.outcome == 'failure') }}
         working-directory: .
         env:
-          FIREBASE_TOKEN: ${{ env.FIREBASE_TOKEN }}
+          # Use token only in fallback; also clear any ADC-related env to avoid conflicts
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
         run: |
           unset GOOGLE_APPLICATION_CREDENTIALS CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE GOOGLE_GHA_CREDS_PATH CLOUDSDK_CORE_PROJECT CLOUDSDK_PROJECT GCLOUD_PROJECT GCP_PROJECT GOOGLE_CLOUD_PROJECT || true
           firebase deploy --only hosting:howdy-site-123,firestore:rules --project ${FIREBASE_PROJECT_ID} --non-interactive
